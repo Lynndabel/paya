@@ -2,10 +2,19 @@ use soroban_sdk::{Env, Symbol, Address, BytesN, String, xdr::ToXdr, symbol_short
 use crate::storage;
 use crate::types::{Error, PaymentRecord, PaymentStatus};
 
-pub fn ensure_initialized(env: &Env) {
+pub fn initialize(env: &Env, admin: Address) {
     if storage::get_version(env) == 0 {
         storage::set_version(env, 1);
+        storage::set_admin(env, admin);
     }
+}
+
+pub fn set_admin(env: &Env, new_admin: Address) -> Result<(), Error> {
+    if let Some(admin) = storage::get_admin(env) {
+        admin.require_auth();
+    }
+    storage::set_admin(env, new_admin);
+    Ok(())
 }
 
 pub fn convert_btc_to_usdc(_env: &Env, btc_amount: i128) -> i128 {
@@ -62,4 +71,25 @@ pub fn create_payment_record(
     env.events().publish((symbol_short!("created"), payment_id.clone()), record);
     
     Ok(payment_id)
+}
+
+pub fn update_payment_status(
+    env: &Env,
+    payment_id: String,
+    status: PaymentStatus,
+) -> Result<(), Error> {
+    // 1. Authorization check
+    let admin = storage::get_admin(env).ok_or(Error::Unauthorized)?;
+    admin.require_auth();
+
+    // 2. Update status in storage
+    storage::update_payment_status(env, payment_id.clone(), status.clone())?;
+
+    // 3. Emit event
+    env.events().publish(
+        (symbol_short!("status_up"), payment_id),
+        status,
+    );
+
+    Ok(())
 }
