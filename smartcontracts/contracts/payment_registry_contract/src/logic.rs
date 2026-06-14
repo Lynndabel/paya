@@ -87,7 +87,7 @@ pub fn update_payment_status(
 
     // 3. Emit event
     env.events().publish(
-        (symbol_short!("status_up"), payment_id),
+        (Symbol::new(env, "PaymentStatusUpdated"), payment_id),
         status,
     );
 
